@@ -1,682 +1,748 @@
 <template>
-  <div class="dashboard-container">
-    <!-- Header Section -->
-    <div class="dashboard-header">
-      <div>
-        <h1 class="dashboard-title">{{ authStore.user?.fullName }}</h1>
-        <h1 class="dashboard-subtitle">Hoş Geldiniz</h1>
-      </div>
-      <div class="header-actions">
-        <v-chip color="primary" variant="elevated" prepend-icon="mdi-calendar-check">
-          Bugün: {{ todayDate }}
-        </v-chip>
-      </div>
+  <div class="ai-dashboard">
+    <!-- Animated Background -->
+    <div class="ai-bg">
+      <div class="ai-bg-orb ai-bg-orb--1"></div>
+      <div class="ai-bg-orb ai-bg-orb--2"></div>
+      <div class="ai-bg-orb ai-bg-orb--3"></div>
     </div>
 
-    <!-- Charts & Tables Row -->
-    <v-row class="content-row">
-      <!-- Revenue Chart -->
-      <v-col cols="12" lg="8" v-if="isAdminOrSuperAdmin">
-        <v-card class="chart-card" elevation="4">
-          <v-card-title class="card-header">
-            <v-icon class="mr-2" color="primary">mdi-chart-line</v-icon>
-            Haftalık Gelir Analizi
-          </v-card-title>
-          <v-card-text>
-            <canvas ref="revenueChart"></canvas>
-          </v-card-text>
-        </v-card>
-      </v-col>
+    <!-- Hero Section -->
+    <section class="hero-section">
+      <div class="hero-greeting">
+        <div class="ai-icon-wrapper">
+          <v-icon size="32" color="white">mdi-robot-happy-outline</v-icon>
+        </div>
+        <h1 class="hero-title">
+          Merhaba, <span class="hero-name">{{ authStore.user?.fullName || 'Kullanıcı' }}</span>
+        </h1>
+        <p class="hero-subtitle">Size bugün nasıl yardımcı olabilirim?</p>
+      </div>
 
-      <!-- Today's Appointments -->
-      <v-col cols="12" :lg="isAdminOrSuperAdmin ? 4 : 12">
-        <v-card class="appointments-card" elevation="4">
-          <v-card-title class="card-header">
-            <v-icon class="mr-2" color="success">mdi-calendar-today</v-icon>
-            Günün Randevuları
-          </v-card-title>
-          <v-card-text class="appointments-list">
-            <!-- Loading State -->
-            <div v-if="loadingAppointments" class="text-center py-4">
-              <v-progress-circular indeterminate color="primary"></v-progress-circular>
-              <p class="mt-2 text-gray-600">Randevular yükleniyor...</p>
-            </div>
-            
-            <!-- Empty State -->
-            <div v-else-if="!todayAppointments.length" class="text-center py-8">
-              <v-icon size="48" color="grey-lighten-1" class="mb-3">mdi-tooth-outline</v-icon>
-              <p class="text-gray-600 text-base">Bugün için planlanmış randevu bulunmuyor</p>
-            </div>
-            
-            <!-- Appointments List -->
-            <div v-else>
-              <div 
-                v-for="appointment in todayAppointments" 
-                :key="appointment.id"
-                class="appointment-item clickable"
-                @click="goToAppointmentDetail(appointment.id)"
-              >
-                <div class="appointment-time">
-                  <v-icon size="20" color="primary">mdi-clock-outline</v-icon>
-                  <span>{{ formatTime(appointment.startTime) }}</span>
-                </div>
-                <div class="appointment-details">
-                  <p class="appointment-patient">{{ appointment.patientName }}</p>
-                  <p class="appointment-doctor">{{ appointment.doctorName }}</p>
-                  <p v-if="appointment.notes" class="appointment-notes">{{ appointment.notes }}</p>
-                </div>
-                <div class="appointment-actions">
-                  <v-chip 
-                    :color="getStatusColor(appointment.status)" 
-                    size="small"
-                    variant="flat"
-                  >
-                    {{ translateStatus(appointment.status) }}
-                  </v-chip>
-                  <v-icon size="20" color="primary" class="ml-2">mdi-chevron-right</v-icon>
-                </div>
-              </div>
-            </div>
-          </v-card-text>
-        </v-card>
-      </v-col>
-    </v-row>
+      <!-- AI Search Input -->
+      <div class="ai-input-container">
+        <div class="ai-input-wrapper" :class="{ 'ai-input-wrapper--focused': isInputFocused }">
+          <v-icon class="ai-input-icon" size="22">mdi-magnify</v-icon>
+          <input
+            v-model="searchQuery"
+            type="text"
+            class="ai-input"
+            placeholder="Bir soru sorun veya makine seçin..."
+            @focus="isInputFocused = true"
+            @blur="isInputFocused = false"
+            @keyup.enter="handleSearch"
+          />
+          <button 
+            v-if="searchQuery" 
+            class="ai-input-clear" 
+            @click="searchQuery = ''"
+          >
+            <v-icon size="18">mdi-close-circle</v-icon>
+          </button>
+          <button class="ai-input-send" @click="handleSearch" :disabled="!searchQuery">
+            <v-icon size="20" color="white">mdi-arrow-up</v-icon>
+          </button>
+        </div>
+      </div>
+    </section>
 
-    <!-- Randevu Detay Modal -->
-    <v-dialog 
-      v-model="showAppointmentModal" 
-      max-width="600px"
-      :persistent="false"
-      eager
-    >
-      <v-card class="appointment-modal-card">
-        <v-card-title class="d-flex align-center">
-          <v-icon class="mr-2" color="primary">mdi-calendar-check</v-icon>
-          Randevu Detayları
-          <v-spacer></v-spacer>
-          <v-btn icon @click="closeAppointmentModal">
-            <v-icon>mdi-close</v-icon>
-          </v-btn>
-        </v-card-title>
-        
-        <v-divider></v-divider>
-        
-        <v-card-text v-if="selectedAppointment" class="pa-6">
-          <v-row>
-            <v-col cols="12" md="6">
-              <div class="detail-section">
-                <h3 class="detail-title">
-                  <v-icon class="mr-2" color="success">mdi-account</v-icon>
-                  Hasta Bilgileri
-                </h3>
-                <p class="detail-text">{{ selectedAppointment.patientName }}</p>
-              </div>
-            </v-col>
-            
-            <v-col cols="12" md="6">
-              <div class="detail-section">
-                <h3 class="detail-title">
-                  <v-icon class="mr-2" color="info">mdi-doctor</v-icon>
-                  Doktor Bilgileri
-                </h3>
-                <p class="detail-text">{{ selectedAppointment.doctorName }}</p>
-              </div>
-            </v-col>
-            
-            <v-col cols="12" md="6">
-              <div class="detail-section">
-                <h3 class="detail-title">
-                  <v-icon class="mr-2" color="primary">mdi-clock</v-icon>
-                  Randevu Saati
-                </h3>
-                <p class="detail-text">{{ formatTime(selectedAppointment.startTime) }} - {{ formatTime(selectedAppointment.endTime) }}</p>
-              </div>
-            </v-col>
-            
-            <v-col cols="12" md="6">
-              <div class="detail-section">
-                <h3 class="detail-title">
-                  <v-icon class="mr-2" color="warning">mdi-information</v-icon>
-                  Durum
-                </h3>
-                <v-chip 
-                  :color="getStatusColor(selectedAppointment.status)" 
-                  variant="flat"
-                  class="detail-status"
-                >
-                  {{ translateStatus(selectedAppointment.status) }}
-                </v-chip>
-              </div>
-            </v-col>
-            
-            <v-col cols="12" md="6">
-              <div class="detail-section">
-                <h3 class="detail-title">
-                  <v-icon class="mr-2" color="purple">mdi-tag</v-icon>
-                  Randevu Tipi
-                </h3>
-                <p class="detail-text">{{ translateAppointmentType(selectedAppointment.type) }}</p>
-              </div>
-            </v-col>
-            
-            <v-col cols="12" md="6">
-              <div class="detail-section">
-                <h3 class="detail-title">
-                  <v-icon class="mr-2" color="orange">mdi-calendar</v-icon>
-                  Tarih
-                </h3>
-                <p class="detail-text">{{ formatDate(selectedAppointment.appointmentDate) }}</p>
-              </div>
-            </v-col>
-            
-            <v-col cols="12" v-if="selectedAppointment.notes">
-              <div class="detail-section">
-                <h3 class="detail-title">
-                  <v-icon class="mr-2" color="grey">mdi-note-text</v-icon>
-                  Notlar
-                </h3>
-                <p class="detail-notes">{{ selectedAppointment.notes }}</p>
-              </div>
-            </v-col>
-          </v-row>
-        </v-card-text>
-        
-        <v-divider></v-divider>
-        
-        <v-card-actions class="pa-4">
-          <v-spacer></v-spacer>
-          <v-btn color="primary" variant="flat" @click="closeAppointmentModal">
-            Kapat
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <!-- Two Column Layout -->
+    <section class="content-columns">
+      <!-- Left: Machine Selection -->
+      <div class="panel machine-panel">
+        <div class="panel-header">
+          <v-icon size="20" class="panel-icon">mdi-cog-outline</v-icon>
+          <h2 class="panel-title">Makine Seçimi</h2>
+          <span v-if="selectedMachines.length" class="panel-badge">{{ selectedMachines.length }}</span>
+        </div>
+
+        <!-- Machine Search -->
+        <div class="machine-search">
+          <v-icon size="18" class="machine-search-icon">mdi-magnify</v-icon>
+          <input
+            v-model="machineFilter"
+            type="text"
+            class="machine-search-input"
+            placeholder="Makine ara..."
+          />
+          <button v-if="machineFilter" class="machine-search-clear" @click="machineFilter = ''">
+            <v-icon size="16">mdi-close</v-icon>
+          </button>
+        </div>
+
+        <!-- Machine List -->
+        <div class="machine-list">
+          <button
+            v-for="machine in filteredMachines"
+            :key="machine.id"
+            class="machine-item"
+            :class="{ 'machine-item--selected': isMachineSelected(machine.id) }"
+            @click="toggleMachine(machine)"
+          >
+            <div class="machine-checkbox">
+              <v-icon v-if="isMachineSelected(machine.id)" size="18" color="white">mdi-check</v-icon>
+            </div>
+            <span class="machine-name">{{ machine.brand }}</span>
+          </button>
+
+          <div v-if="!filteredMachines.length" class="machine-empty">
+            <v-icon size="28" color="grey-lighten-1">mdi-magnify-close</v-icon>
+            <span>Makine bulunamadı</span>
+          </div>
+        </div>
+
+        <!-- Selected summary -->
+        <button 
+          v-if="selectedMachines.length > 0" 
+          class="machine-clear-btn"
+          @click="selectedMachines = []"
+        >
+          <v-icon size="16">mdi-close-circle-outline</v-icon>
+          Seçimi Temizle
+        </button>
+      </div>
+
+      <!-- Right: Template Questions -->
+      <div class="panel templates-panel">
+        <div class="panel-header">
+          <v-icon size="20" class="panel-icon">mdi-lightbulb-outline</v-icon>
+          <h2 class="panel-title">Hazır Şablonlar</h2>
+        </div>
+
+        <div class="templates-list">
+          <button
+            v-for="(template, index) in templateQuestions"
+            :key="index"
+            class="template-card"
+            @click="selectTemplate(template)"
+          >
+            <div class="template-icon-wrapper" :class="`template-icon--${template.color}`">
+              <v-icon size="20" color="white">{{ template.icon }}</v-icon>
+            </div>
+            <div class="template-content">
+              <h3 class="template-title">{{ template.title }}</h3>
+              <p class="template-desc">{{ template.description }}</p>
+            </div>
+            <v-icon class="template-arrow" size="18">mdi-chevron-right</v-icon>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <div class="ai-footer">
+      <p>MemberShip AI ile daha akıllı üretim yönetimi</p>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, computed, watch } from 'vue'
-import { Chart, registerables } from 'chart.js'
-import { useApi } from '~/composables/useApi'
-import { useAuth } from '~/composables/useAuth'
+import { ref, computed } from 'vue'
 import { useAuthStore } from '~/stores/auth'
-
-Chart.register(...registerables)
 
 definePageMeta({
   middleware: ['auth', 'permission'],
 })
 
 const authStore = useAuthStore()
-const { hasRole } = useAuth()
-const { get } = useApi()
 
-const isAdminOrSuperAdmin = computed(() => {
-  return hasRole('Admin') || hasRole('SuperAdmin')
+const searchQuery = ref('')
+const isInputFocused = ref(false)
+const machineFilter = ref('')
+const selectedMachines = ref<number[]>([])
+
+const templateQuestions = ref([
+  {
+    icon: 'mdi-alert-circle-outline',
+    title: 'Son Arızalar',
+    description: 'Son yaşanan arızaları listele ve detaylarını göster',
+    color: 'red',
+    query: 'Son yaşanan arızaları listele'
+  },
+  {
+    icon: 'mdi-frequently-asked-questions',
+    title: 'Arıza Nedeni',
+    description: 'Arızanın kök nedenini analiz et ve raporla',
+    color: 'amber',
+    query: 'Bu arızanın kök nedeni nedir?'
+  },
+  {
+    icon: 'mdi-wrench-outline',
+    title: 'Çözüm Önerisi',
+    description: 'Arıza için en uygun çözüm yöntemini öner',
+    color: 'blue',
+    query: 'Bu arıza için çözüm önerisi ver'
+  },
+  {
+    icon: 'mdi-chart-line',
+    title: 'Arıza Sıklığı',
+    description: 'Tekrarlayan arızaları ve sıklıklarını analiz et',
+    color: 'purple',
+    query: 'Tekrarlayan arızaları ve sıklıklarını göster'
+  },
+  {
+    icon: 'mdi-clock-alert-outline',
+    title: 'Duruş Süresi',
+    description: 'Arızadan kaynaklı toplam duruş süresini hesapla',
+    color: 'teal',
+    query: 'Arızalardan kaynaklı toplam duruş süresini göster'
+  },
+  {
+    icon: 'mdi-shield-alert-outline',
+    title: 'Önleyici Bakım',
+    description: 'Arıza riskini azaltacak bakım önerilerini listele',
+    color: 'green',
+    query: 'Arıza riskini azaltmak için önleyici bakım önerilerini listele'
+  },
+])
+
+const machines = ref([
+  { id: 1, brand: 'Siemens' },
+  { id: 2, brand: 'Bosch' },
+  { id: 3, brand: 'ABB' },
+  { id: 4, brand: 'FANUC' },
+  { id: 5, brand: 'KUKA' },
+  { id: 6, brand: 'Mitsubishi' },
+  { id: 7, brand: 'Schneider' },
+  { id: 8, brand: 'Haas' },
+])
+
+const filteredMachines = computed(() => {
+  if (!machineFilter.value) return machines.value
+  const q = machineFilter.value.toLowerCase()
+  return machines.value.filter(m => m.brand.toLowerCase().includes(q))
 })
 
-const revenueChart = ref<HTMLCanvasElement>()
-const loadingAppointments = ref(false)
-const showAppointmentModal = ref(false)
-const selectedAppointment = ref(null)
+const isMachineSelected = (id: number) => {
+  return selectedMachines.value.includes(id)
+}
 
-const stats = ref({
-  todayAppointments: 24,
-  todayRevenue: 45750,
-  totalPatients: 1248,
-  activeDoctors: 8
-})
-
-const todayDate = computed(() => {
-  return new Date().toLocaleDateString('tr-TR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  })
-})
-
-const todayAppointments = ref([])
-
-const fetchTodayAppointments = async () => {
-  try {
-    loadingAppointments.value = true
-    const response = await get('/api/Appointment/today')
-    if (response && response.value) {
-      todayAppointments.value = response.value
-    }
-  } catch (error) {
-    console.error('Bugünkü randevular yüklenirken hata oluştu:', error)
-    todayAppointments.value = []
-  } finally {
-    loadingAppointments.value = false
+const toggleMachine = (machine: any) => {
+  const idx = selectedMachines.value.indexOf(machine.id)
+  if (idx > -1) {
+    selectedMachines.value.splice(idx, 1)
+  } else {
+    selectedMachines.value.push(machine.id)
   }
 }
 
-const formatTime = (timeString: string) => {
-  if (!timeString) return ''
-  return timeString.substring(0, 5)
+const selectTemplate = (template: any) => {
+  searchQuery.value = template.query
 }
 
-const translateStatus = (status: string) => {
-  const statusMap: { [key: string]: string } = {
-    'Scheduled': 'Planlandı',
-    'Confirmed': 'Onaylandı',
-    'InProgress': 'Devam Ediyor',
-    'Completed': 'Tamamlandı',
-    'Cancelled': 'İptal Edildi',
-    'NoShow': 'Gelmedi'
-  }
-  return statusMap[status] || status
+const handleSearch = () => {
+  if (!searchQuery.value.trim()) return
 }
-
-const translateAppointmentType = (type: string) => {
-  const typeMap: { [key: string]: string } = {
-    'FirstVisit': 'İlk Ziyaret',
-    'Checkup': 'Kontrol',
-    'Treatment': 'Tedavi',
-    'Consultation': 'Konsültasyon',
-    'Emergency': 'Acil',
-    'FollowUp': 'Takip'
-  }
-  return typeMap[type] || type
-}
-
-const formatDate = (dateString: string) => {
-  if (!dateString) return ''
-  const date = new Date(dateString)
-  return date.toLocaleDateString('tr-TR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric'
-  })
-}
-
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case 'Completed':
-    case 'Tamamlandı': 
-      return 'success'
-    case 'InProgress':
-    case 'Devam Ediyor': 
-      return 'warning'
-    case 'Scheduled':
-    case 'Confirmed':
-    case 'Planlandı':
-    case 'Onaylandı':
-    case 'Bekliyor': 
-      return 'info'
-    case 'Cancelled':
-    case 'NoShow':
-    case 'İptal':
-    case 'Gelmedi': 
-      return 'error'
-    default: 
-      return 'grey'
-  }
-}
-
-const goToAppointmentDetail = (appointmentId: number) => {
-  const appointment = todayAppointments.value.find(app => app.id === appointmentId)
-  if (appointment) {
-    selectedAppointment.value = appointment
-    showAppointmentModal.value = true
-  }
-}
-
-const closeAppointmentModal = () => {
-  showAppointmentModal.value = false
-  selectedAppointment.value = null
-}
-
-const handleKeyPress = (event: KeyboardEvent) => {
-  if (event.key === 'Escape' && showAppointmentModal.value) {
-    closeAppointmentModal()
-  }
-}
-
-const handleModalClick = (event: MouseEvent) => {
-  const target = event.target as HTMLElement
-  if (target.classList.contains('v-overlay__scrim') || 
-      target.classList.contains('v-overlay') ||
-      target.classList.contains('v-overlay__content')) {
-    closeAppointmentModal()
-  }
-}
-
-watch(showAppointmentModal, (newValue) => {
-  if (!newValue) {
-    selectedAppointment.value = null
-  }
-})
-
-const initRevenueChart = () => {
-  if (!revenueChart.value) return
-
-  new Chart(revenueChart.value, {
-    type: 'line',
-    data: {
-      labels: ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'],
-      datasets: [{
-        label: 'Gelir (₺)',
-        data: [12500, 19800, 15200, 21300, 18900, 25400, 22100],
-        borderColor: 'rgb(102, 126, 234)',
-        backgroundColor: 'rgba(102, 126, 234, 0.1)',
-        tension: 0.4,
-        fill: true
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          display: false
-        }
-      },
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: {
-            callback: function(value) {
-              return '₺' + value.toLocaleString()
-            }
-          }
-        }
-      }
-    }
-  })
-}
-
-onMounted(async () => {
-  await fetchTodayAppointments()
-  
-  if (isAdminOrSuperAdmin.value) {
-    setTimeout(() => {
-      initRevenueChart()
-    }, 100)
-  }
-  
-  document.addEventListener('keydown', handleKeyPress)
-  document.addEventListener('click', handleModalClick)
-})
-
-onBeforeUnmount(() => {
-  document.removeEventListener('keydown', handleKeyPress)
-  document.removeEventListener('click', handleModalClick)
-})
 
 useHead({
-  title: 'Dashboard - MemberShip'
+  title: 'Dashboard - MemberShip AI'
 })
 </script>
 
 <style scoped>
-.dashboard-container {
-  padding: 24px;
-  background: #f5f7fa;
+.ai-dashboard {
+  position: relative;
   min-height: 100vh;
-}
-
-.dashboard-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 32px;
-  background: white;
-  padding: 24px;
-  border-radius: 16px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
-
-.dashboard-title {
-  font-size: 2rem;
-  font-weight: 700;
-  color: #2c3e50;
-  margin: 0;
-}
-
-.dashboard-subtitle {
-  font-size: 1.1rem;
-  color: #7f8c8d;
-  margin-top: 8px;
-}
-
-.header-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.stats-row {
-  margin-bottom: 24px;
-}
-
-.stat-card {
-  border-radius: 16px !important;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  background: #f1f5f9;
+  padding: 32px 40px 60px;
   overflow: hidden;
 }
 
-.stat-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15) !important;
+/* Animated Background Orbs */
+.ai-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
 }
 
-.stat-card-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+.ai-bg-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.12;
+  animation: orbFloat 20s ease-in-out infinite;
 }
 
-.stat-card-success {
-  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+.ai-bg-orb--1 {
+  width: 500px;
+  height: 500px;
+  background: #334155;
+  top: -120px;
+  right: -100px;
 }
 
-.stat-card-warning {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+.ai-bg-orb--2 {
+  width: 400px;
+  height: 400px;
+  background: #0f172a;
+  bottom: -80px;
+  left: -60px;
+  animation-delay: -7s;
 }
 
-.stat-card-info {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+.ai-bg-orb--3 {
+  width: 300px;
+  height: 300px;
+  background: #475569;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation-delay: -14s;
 }
 
-.stat-card :deep(.v-card-text) {
+@keyframes orbFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(30px, -40px) scale(1.1); }
+  50% { transform: translate(-20px, 20px) scale(0.95); }
+  75% { transform: translate(15px, 30px) scale(1.05); }
+}
+
+/* Hero */
+.hero-section {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 40px 0 36px;
+}
+
+.hero-greeting {
+  margin-bottom: 32px;
+}
+
+.ai-icon-wrapper {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 18px;
+  background: linear-gradient(180deg, #0f172a 0%, #334155 100%);
+  border-radius: 18px;
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 24px !important;
+  justify-content: center;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.25);
+  animation: iconPulse 3s ease-in-out infinite;
 }
 
-.stat-icon-wrapper {
-  width: 80px;
-  height: 80px;
-  background: rgba(255, 255, 255, 0.2);
+@keyframes iconPulse {
+  0%, 100% { box-shadow: 0 8px 32px rgba(15, 23, 42, 0.25); }
+  50% { box-shadow: 0 8px 48px rgba(15, 23, 42, 0.4); }
+}
+
+.hero-title {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #0f172a;
+  letter-spacing: -0.03em;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.hero-name {
+  background: linear-gradient(135deg, #0f172a, #475569);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.hero-subtitle {
+  font-size: 1.1rem;
+  color: #64748b;
+  margin-top: 8px;
+  font-weight: 400;
+}
+
+/* AI Input */
+.ai-input-container {
+  max-width: 660px;
+  margin: 0 auto;
+}
+
+.ai-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: white;
+  border: 2px solid #e2e8f0;
   border-radius: 16px;
+  padding: 6px 8px 6px 20px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.04);
+}
+
+.ai-input-wrapper--focused {
+  border-color: #334155;
+  box-shadow: 0 4px 32px rgba(15, 23, 42, 0.1);
+}
+
+.ai-input-icon {
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.ai-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 1rem;
+  color: #0f172a;
+  background: transparent;
+  padding: 12px 0;
+  font-family: inherit;
+}
+
+.ai-input::placeholder {
+  color: #94a3b8;
+}
+
+.ai-input-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+
+.ai-input-clear:hover {
+  color: #475569;
+}
+
+.ai-input-send {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #0f172a 0%, #334155 100%);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.ai-input-send:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.3);
+}
+
+.ai-input-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Two Column Layout */
+.content-columns {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+/* Panel Shared */
+.panel {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.04);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.panel-icon {
+  color: #334155;
+}
+
+.panel-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.panel-badge {
+  margin-left: auto;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #0f172a 0%, #334155 100%);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Machine Panel */
+.machine-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 9px 12px;
+  margin-bottom: 14px;
+  transition: border-color 0.2s;
+}
+
+.machine-search:focus-within {
+  border-color: #94a3b8;
+}
+
+.machine-search-icon {
+  color: #94a3b8;
+  flex-shrink: 0;
+}
+
+.machine-search-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.85rem;
+  color: #334155;
+  font-family: inherit;
+}
+
+.machine-search-input::placeholder {
+  color: #94a3b8;
+}
+
+.machine-search-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  transition: color 0.2s;
+}
+
+.machine-search-clear:hover {
+  color: #475569;
+}
+
+.machine-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.machine-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  text-align: left;
+}
+
+.machine-item:hover {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.machine-item--selected {
+  background: #f0f4ff;
+  border-color: #c7d2fe;
+}
+
+.machine-item--selected:hover {
+  background: #e8edff;
+}
+
+.machine-checkbox {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 2px solid #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.machine-item--selected .machine-checkbox {
+  background: linear-gradient(180deg, #0f172a 0%, #334155 100%);
+  border-color: transparent;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.2);
+}
+
+.machine-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.machine-item--selected .machine-name {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.machine-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 32px 0;
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.machine-clear-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 14px;
+  padding: 9px;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  background: #fff5f5;
+  color: #dc2626;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+
+.machine-clear-btn:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+/* Templates Panel */
+.templates-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.template-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: left;
+  font-family: inherit;
+}
+
+.template-card:hover {
+  transform: translateX(4px);
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06);
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
+.template-icon-wrapper {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
 }
 
-.stat-content {
+.template-icon--blue { background: linear-gradient(135deg, #3b82f6, #1d4ed8); }
+.template-icon--amber { background: linear-gradient(135deg, #f59e0b, #d97706); }
+.template-icon--red { background: linear-gradient(135deg, #ef4444, #dc2626); }
+.template-icon--green { background: linear-gradient(135deg, #22c55e, #16a34a); }
+.template-icon--purple { background: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+.template-icon--teal { background: linear-gradient(135deg, #14b8a6, #0d9488); }
+
+.template-content {
   flex: 1;
-  color: white;
+  min-width: 0;
 }
 
-.stat-value {
-  font-size: 2.5rem;
+.template-title {
+  font-size: 0.88rem;
   font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 2px;
+}
+
+.template-desc {
+  font-size: 0.75rem;
+  color: #94a3b8;
   margin: 0;
-  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.stat-label {
-  font-size: 0.95rem;
-  opacity: 0.9;
-  margin: 8px 0;
+.template-arrow {
+  color: #cbd5e1;
+  flex-shrink: 0;
+  transition: all 0.25s;
 }
 
-.stat-trend {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.85rem;
-  opacity: 0.8;
+.template-card:hover .template-arrow {
+  color: #334155;
+  transform: translateX(3px);
 }
 
-.content-row {
-  margin-bottom: 24px;
+/* Footer */
+.ai-footer {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding-top: 16px;
 }
 
-.chart-card, .appointments-card {
-  border-radius: 16px !important;
-  height: 100%;
-}
-
-.card-header {
-  background: #f8f9fa;
-  font-weight: 600 !important;
-  padding: 20px 24px !important;
-  border-bottom: 1px solid #e9ecef;
-}
-
-.chart-card :deep(.v-card-text) {
-  height: 400px;
-  padding: 24px !important;
-}
-
-.appointments-list {
-  max-height: 500px;
-  overflow-y: auto;
-  padding: 16px !important;
-}
-
-.appointment-item {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-  border-radius: 12px;
-  margin-bottom: 12px;
-  background: #f8f9fa;
-  transition: all 0.3s ease;
-}
-
-.appointment-item.clickable {
-  cursor: pointer;
-}
-
-.appointment-item:hover {
-  background: #e9ecef;
-  transform: translateX(4px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
-}
-
-.appointment-actions {
-  display: flex;
-  align-items: center;
-}
-
-.appointment-time {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 80px;
-  font-weight: 600;
-  color: #667eea;
-}
-
-.appointment-details {
-  flex: 1;
-}
-
-.appointment-patient {
-  font-weight: 600;
-  margin: 0;
-  color: #2c3e50;
-}
-
-.appointment-doctor {
-  font-size: 0.85rem;
-  color: #7f8c8d;
-  margin: 4px 0 0 0;
-}
-
-.appointment-notes {
+.ai-footer p {
   font-size: 0.8rem;
-  color: #95a5a6;
-  margin: 2px 0 0 0;
-  font-style: italic;
+  color: #94a3b8;
+  margin: 0;
 }
 
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(102, 126, 234, 0.3);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(102, 126, 234, 0.5);
-}
-
+/* Responsive */
 @media (max-width: 960px) {
-  .dashboard-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
+  .content-columns {
+    grid-template-columns: 1fr;
   }
 
-  .dashboard-title {
-    font-size: 2rem;
+}
+
+@media (max-width: 768px) {
+  .ai-dashboard {
+    padding: 20px 16px 40px;
+  }
+
+  .hero-title {
+    font-size: 1.8rem;
   }
 }
 
-.detail-section {
-  margin-bottom: 20px;
-}
-
-.detail-title {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #2c3e50;
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-}
-
-.detail-text {
-  font-size: 1rem;
-  color: #34495e;
-  margin: 0;
-  font-weight: 500;
-}
-
-.detail-notes {
-  font-size: 0.95rem;
-  color: #7f8c8d;
-  margin: 0;
-  background: #f8f9fa;
-  padding: 12px;
-  border-radius: 8px;
-  border-left: 4px solid #667eea;
-}
-
-.detail-status {
-  font-weight: 600 !important;
-}
-
-:deep(.v-dialog .v-card) {
-  border-radius: 16px !important;
-}
-
-:deep(.v-dialog .v-card-title) {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white !important;
-  font-weight: 600 !important;
-}
 </style>
