@@ -21,17 +21,17 @@ gibi öğeleri kolayca özelleştirebilirsiniz.
 ```json
 {
   "app": {
-    "name": "{{PROJECT_NAME}}",
+    "name": "MemberShip",
     "version": "1.0.0",
     "description": "Modern Authentication System",
     "logo": {
       "src": "/images/logo.svg",
-      "alt": "{{PROJECT_NAME}} Logo",
+      "alt": "MemberShip Logo",
       "width": "32",
       "height": "32"
     },
     "brand": {
-      "text": "{{PROJECT_NAME}}",
+      "text": "MemberShip",
       "tagline": "Secure Authentication System"
     }
   }

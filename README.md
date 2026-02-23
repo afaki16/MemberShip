@@ -7,11 +7,11 @@ Bu template ile hızlıca .NET Web API + Nuxt.js projesi oluşturabilirsiniz.
 ```
 Kickstart/
 ├── backend/                 # .NET Web API
-│   ├── {{PROJECT_NAME}}.API/
-│   ├── {{PROJECT_NAME}}.Application/
-│   ├── {{PROJECT_NAME}}.Domain/
-│   ├── {{PROJECT_NAME}}.Infrastructure/
-│   └── {{PROJECT_NAME}}.sln
+│   ├── MemberShip.API/
+│   ├── MemberShip.Application/
+│   ├── MemberShip.Domain/
+│   ├── MemberShip.Infrastructure/
+│   └── MemberShip.sln
 ├── frontend/               # Nuxt.js Frontend
 │   ├── package.json
 │   ├── nuxt.config.ts
@@ -127,7 +127,7 @@ npm run dev
 
 ## 📝 Kurulum Sonrası Ne Olur?
 
-- ✅ Tüm `{{PROJECT_NAME}}` placeholder'ları değişir
+- ✅ Tüm `MemberShip` placeholder'ları değişir
 - ✅ Dosya ve klasör isimleri güncellenir
 - ✅ Namespace'ler otomatik düzenlenir
 - ✅ Package.json güncellenir

@@ -175,9 +175,9 @@ onUnmounted(() => {
 
 // SEO
 useHead({
-  title: 'Create Account - {{PROJECT_NAME}}',
+  title: 'Create Account - MemberShip',
   meta: [
-    { name: 'description', content: 'Create your {{PROJECT_NAME}} account' }
+    { name: 'description', content: 'Create your MemberShip account' }
   ]
 })
 </script>

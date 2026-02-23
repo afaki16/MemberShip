@@ -1,0 +1,41 @@
+using MemberShip.Application.Features.Tenants.Commands.CreateTenant;
+using MemberShip.Application.Features.Tenants.Commands.UpdateTenant;
+using MemberShip.Application.Features.Tenants.Commands.DeleteTenant;
+using MemberShip.Domain.Common.Interfaces;
+using MemberShip.Domain.Common.Interfaces.Repositories;
+using MemberShip.Application.Common.Results;
+using MemberShip.Domain.Models;
+using MediatR;
+using System.Threading;
+using System.Threading.Tasks;
+using MemberShip.Domain.Common.Enums;
+
+namespace MemberShip.Application.Features.Tenants.Commands.DeleteTenant;
+
+    public class DeleteTenantCommandHandler : IRequestHandler<DeleteTenantCommand, Result<bool>>
+{
+    private readonly IUnitOfWork _unitOfWork;
+
+    public DeleteTenantCommandHandler(IUnitOfWork unitOfWork)
+    {
+        _unitOfWork = unitOfWork;
+    }
+
+    public async Task<Result<bool>> Handle(DeleteTenantCommand request, CancellationToken cancellationToken)
+    {
+        var tenant = await _unitOfWork.Tenants.GetByIdAsync(request.Id);
+
+        if (tenant == null)
+        {
+            return Result<bool>.Failure(Error.Failure(
+                ErrorCode.NotFound,
+                "Tenant not found"));
+        }
+
+        // Soft delete - User'ların TenantId'si null olur (DeleteBehavior.SetNull)
+        _unitOfWork.Tenants.SoftDelete(tenant);
+        await _unitOfWork.SaveChangesAsync();
+
+        return Result<bool>.Success(true);
+    }
+}

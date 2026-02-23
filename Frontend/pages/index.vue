@@ -270,9 +270,9 @@ onUnmounted(() => {
 
 // SEO
 useHead({
-  title: '{{PROJECT_NAME}} - Authentication System',
+  title: 'MemberShip - Authentication System',
   meta: [
-    { name: 'description', content: 'Sign in to your {{PROJECT_NAME}} account' }
+    { name: 'description', content: 'Sign in to your MemberShip account' }
   ]
 })
 </script>

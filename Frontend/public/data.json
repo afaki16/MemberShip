@@ -1,16 +1,16 @@
 {
   "app": {
-    "name": "{{PROJECT_NAME}}",
+    "name": "MACH4AI",
     "version": "1.0.0",
     "description": "Modern Authentication System",
     "logo": {
-      "src": "/images/logo.svg",
-      "alt": "{{PROJECT_NAME}} Logo",
+      "src": "/images/mac3d.png",
+      "alt": "MACH4AI Logo",
       "width": "32",
       "height": "32"
     },
     "brand": {
-      "text": "{{PROJECT_NAME}}",
+      "text": "MACH4AI",
       "tagline": "Secure Authentication System"
     }
   },
@@ -66,7 +66,7 @@
       "https://images.unsplash.com/photo-1518709268805-4e9042af2176?ixlib=rb-4.0.3&auto=format&fit=crop&w=2125&q=80",
       "https://images.unsplash.com/photo-1555066931-4365d14bab8c?ixlib=rb-4.0.3&auto=format&fit=crop&w=2070&q=80"
     ],
-    "rotationInterval": 3000,
+    "rotationInterval": 1000,
     "overlay": {
       "opacity": 0.4,
       "color": "rgba(0, 0, 0, 0.4)"

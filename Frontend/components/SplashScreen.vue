@@ -11,7 +11,7 @@
           <v-icon class="splash-logo-pulse-gear" icon="mdi-cog"></v-icon>
           
           <img
-            :src="appData?.app?.logo?.src || '/images/logo.png'"
+            :src="appData?.app?.logo?.src || '/images/mac3d.png'"
             :alt="appData?.app?.logo?.alt || 'Logo'"
             class="splash-logo-img"
           />
@@ -59,7 +59,7 @@ onMounted(() => {
   setTimeout(() => { 
     showSplash.value = false;
     emit('complete');
-  }, 13000);
+  }, 1500);
 })
 </script>
 
